@@ -1,0 +1,42 @@
+# Workspace build outputs
+catkin_ws/build/
+catkin_ws/devel/
+catkin_ws/install/
+catkin_ws/log/
+catkin_ws/logs/
+catkin_ws/.catkin_tools/
+
+# PX4 build outputs
+PX4_Firmware/build/
+PX4_Firmware/build_*/
+PX4_Firmware/logs/
+PX4_Firmware/coverage*/
+PX4_Firmware/mavsdk_tests/
+PX4_Firmware/.ninja_*
+PX4_Firmware/build.ninja
+PX4_Firmware/CMakeFiles/
+PX4_Firmware/CMakeCache.txt
+PX4_Firmware/cmake_install.cmake
+PX4_Firmware/compile_commands.json
+
+# Generic CMake outputs
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CTestTestfile.cmake
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Runtime/log data
+**/*.log
+**/*.bag
+**/*.ulg
