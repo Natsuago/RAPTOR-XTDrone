@@ -4,6 +4,7 @@
 本仓库将 XTDrone 仿真基础（PX4 + Gazebo Classic + ROS）与 RAPTOR 外部模块集成到同一工作区，用于后续端到端策略验证与上板迁移。
 
 本次为首次集成版本：RAPTOR 模块已编入 PX4 SITL 二进制，并补齐了 XTDrone(PX4 v1.13) 的兼容适配。
+当前已完成 legacy 链路接管适配：在 XTDrone 默认 `actuator_controls_0 -> mixer -> pwm_out_sim` 链路内支持 RAPTOR 策略接管与回退。
 
 适配细节与后续增量更新统一维护在：[`docs/xtdrone-raptor-adaptation.md`](docs/xtdrone-raptor-adaptation.md)
 

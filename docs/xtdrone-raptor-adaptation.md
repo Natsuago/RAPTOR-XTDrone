@@ -24,6 +24,20 @@
 ### 2.3 链接与版本信息适配
 - 在 `version.c` 增加 `px4_mavlink_lib_version_binary()` 回退实现，解决无嵌套 mavlink git 元数据时的链接问题
 
+### 2.4 XTDrone legacy 输出链接管适配（SITL）
+- 目标：不改 XTDrone 默认主链路前提下，让 RAPTOR 真正接管输出。
+- 实现位置：`PX4_Firmware/src/lib/mixer_module/mixer_module.cpp`（static mixer 分支）。
+- 实现方式：
+  - 订阅 `rl_tools_policy_status` 与 `actuator_motors_rl_tools`；
+  - 仅采信 `exit_reason==NONE` 的策略状态并做短时保持，避免 400Hz 下状态抖动导致频繁回切；
+  - 将 RAPTOR 电机输出（`actuator_motors_rl_tools`）按 `quad_wide` 归一化混控矩阵逆变换为 `actuator_controls_0` 的 `roll/pitch/yaw/throttle`；
+  - 继续复用 XTDrone 原链路：`actuator_controls_0 -> quad_w mixer -> pwm_out_sim`。
+- 回退策略：
+  - 若策略失活、状态超时或电机话题超时，则自动回退到 PX4 默认控制链。
+- 运行验证（SITL）：
+  - 策略运行时 `actuator_outputs[0..3]` 可直接跟随 `actuator_motors_rl_tools`；
+  - 停止 `rl_tools_policy` 后，输出自动回落到默认链路的低油门状态。
+
 ## 3. SITL 频率对齐（为后续 HITL 准备）
 官方 RAPTOR 建议频率对齐到高频（常见 400Hz）。
 
@@ -50,5 +64,6 @@
 
 ## 5. 变更记录（持续追加）
 - 2026-02-12：首次完成 RAPTOR 外部模块集成、PX4 v1.13 兼容修复、RAPTOR 专用 400Hz SITL 配置。
+- 2026-02-12：完成 XTDrone legacy 输出链接管适配（static mixer 内注入 RAPTOR 控制），并验证策略停更时可自动回退默认链路。
 
 后续每次适配更新请在本文件追加记录，不在 README 中堆叠细节。

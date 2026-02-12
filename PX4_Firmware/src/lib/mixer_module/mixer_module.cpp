@@ -641,6 +641,82 @@ bool MixingOutput::update()
 		return updateStaticMixer();
 	}
 }
+
+bool MixingOutput::applyRaptorLegacyOverride()
+{
+	// XTDrone legacy path uses static mixing from actuator_controls_0.
+	// When RAPTOR policy is active, translate its per-motor command back to
+	// equivalent roll/pitch/yaw/thrust for the quad_wide mixer and inject it
+	// into control group 0.
+	if (_use_dynamic_mixing || _armed.in_esc_calibration_mode || !_rl_tools_policy_active) {
+		return false;
+	}
+
+	// Require fresh policy motor output.
+	const hrt_abstime now = hrt_absolute_time();
+	if ((_timestamp_last_rl_tools_policy_valid == 0) || ((now - _timestamp_last_rl_tools_policy_valid) > 100_ms)) {
+		return false;
+	}
+
+	if ((_timestamp_last_rl_tools_motors == 0) || ((now - _timestamp_last_rl_tools_motors) > 100_ms)) {
+		return false;
+	}
+
+	const float m0 = _actuator_motors_rl_tools.control[0];
+	const float m1 = _actuator_motors_rl_tools.control[1];
+	const float m2 = _actuator_motors_rl_tools.control[2];
+	const float m3 = _actuator_motors_rl_tools.control[3];
+
+	if (!PX4_ISFINITE(m0) || !PX4_ISFINITE(m1) || !PX4_ISFINITE(m2) || !PX4_ISFINITE(m3)) {
+		return false;
+	}
+
+	// Clamp policy motor commands to the same domain used by the multirotor
+	// mixer before conversion to [-1, 1].
+	const float u0 = math::constrain(m0, 0.f, 1.f);
+	const float u1 = math::constrain(m1, 0.f, 1.f);
+	const float u2 = math::constrain(m2, 0.f, 1.f);
+	const float u3 = math::constrain(m3, 0.f, 1.f);
+
+	// Inverse of quad_wide normalized mixer matrix:
+	// [m0..m3]^T = A * [roll, pitch, yaw, thrust]^T
+	// values from mixer_multirotor_normalized.generated.h (_config_quad_wide).
+	constexpr float inv_a00 = -0.5717536f;
+	constexpr float inv_a01 = 0.437566461f;
+	constexpr float inv_a02 = 0.5717536f;
+	constexpr float inv_a03 = -0.437566461f;
+	constexpr float inv_a10 = 0.353553281f;
+	constexpr float inv_a11 = -0.353553281f;
+	constexpr float inv_a12 = 0.353553281f;
+	constexpr float inv_a13 = -0.353553281f;
+	constexpr float inv_a20 = 0.283237014f;
+	constexpr float inv_a21 = 0.283237014f;
+	constexpr float inv_a22 = -0.283237014f;
+	constexpr float inv_a23 = -0.283237014f;
+	constexpr float inv_a30 = 0.25f;
+	constexpr float inv_a31 = 0.25f;
+	constexpr float inv_a32 = 0.25f;
+	constexpr float inv_a33 = 0.25f;
+
+	const float roll = inv_a00 * u0 + inv_a01 * u1 + inv_a02 * u2 + inv_a03 * u3;
+	const float pitch = inv_a10 * u0 + inv_a11 * u1 + inv_a12 * u2 + inv_a13 * u3;
+	const float yaw = inv_a20 * u0 + inv_a21 * u1 + inv_a22 * u2 + inv_a23 * u3;
+	const float thrust = inv_a30 * u0 + inv_a31 * u1 + inv_a32 * u2 + inv_a33 * u3;
+
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].control[actuator_controls_s::INDEX_ROLL] =
+		math::constrain(roll, -1.f, 1.f);
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].control[actuator_controls_s::INDEX_PITCH] =
+		math::constrain(pitch, -1.f, 1.f);
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].control[actuator_controls_s::INDEX_YAW] =
+		math::constrain(yaw, -1.f, 1.f);
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].control[actuator_controls_s::INDEX_THROTTLE] =
+		math::constrain(thrust, 0.f, 1.f);
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].timestamp_sample = _actuator_motors_rl_tools.timestamp_sample;
+	_controls[actuator_controls_s::GROUP_INDEX_ATTITUDE].timestamp = now;
+
+	return true;
+}
+
 bool MixingOutput::updateStaticMixer()
 {
 	if (!_mixers) {
@@ -673,6 +749,21 @@ bool MixingOutput::updateStaticMixer()
 
 	unsigned n_updates = 0;
 
+	RlToolsPolicyStatus_s rl_tools_policy_status {};
+
+	if (_rl_tools_policy_status_sub.update(&rl_tools_policy_status)) {
+		_rl_tools_policy_status = rl_tools_policy_status;
+
+		if (rl_tools_policy_status.exit_reason == RlToolsPolicyStatus_s::EXIT_REASON_NONE) {
+			_rl_tools_policy_active = rl_tools_policy_status.active;
+			_timestamp_last_rl_tools_policy_valid = hrt_absolute_time();
+		}
+	}
+
+	if (_actuator_motors_rl_tools_sub.update(&_actuator_motors_rl_tools)) {
+		_timestamp_last_rl_tools_motors = hrt_absolute_time();
+	}
+
 	/* get controls for required topics */
 	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
 		if (_groups_subscribed & (1 << i)) {
@@ -693,6 +784,10 @@ bool MixingOutput::updateStaticMixer()
 				_output_state = OutputLimitState::ON;
 			}
 		}
+	}
+
+	if (applyRaptorLegacyOverride() && n_updates == 0) {
+		n_updates = 1;
 	}
 
 	// check for motor test (after topic updates)

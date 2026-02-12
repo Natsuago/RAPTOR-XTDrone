@@ -48,9 +48,11 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/actuator_motors.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/control_allocator_status.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/RlToolsPolicyStatus.h>
 #include <uORB/topics/test_motor.h>
 
 using namespace time_literals;
@@ -243,6 +245,7 @@ private:
 	void initParamHandles();
 
 	void limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updates);
+	bool applyRaptorLegacyOverride();
 
 	uint16_t output_limit_calc_single(int i, float value) const;
 
@@ -291,12 +294,19 @@ private:
 
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 	uORB::SubscriptionCallbackWorkItem _control_subs[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
+	uORB::Subscription _rl_tools_policy_status_sub{ORB_ID(rl_tools_policy_status)};
+	uORB::Subscription _actuator_motors_rl_tools_sub{ORB_ID(actuator_motors_rl_tools)};
 
 	uORB::PublicationMulti<actuator_outputs_s> _outputs_pub{ORB_ID(actuator_outputs)};
 	uORB::PublicationMulti<control_allocator_status_s> _control_allocator_status_pub{ORB_ID(control_allocator_status)};
 
 	actuator_controls_s _controls[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
+	RlToolsPolicyStatus_s _rl_tools_policy_status {};
+	actuator_motors_s _actuator_motors_rl_tools {};
+	bool _rl_tools_policy_active{false};
 	actuator_armed_s _armed{};
+	hrt_abstime _timestamp_last_rl_tools_policy_valid{0};
+	hrt_abstime _timestamp_last_rl_tools_motors{0};
 
 	hrt_abstime _time_last_dt_update_multicopter{0};
 	hrt_abstime _time_last_dt_update_simple_mixer{0};
