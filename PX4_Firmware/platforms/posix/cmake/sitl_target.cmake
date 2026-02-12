@@ -99,18 +99,24 @@ ExternalProject_Add(mavsdk_tests
 	BUILD_ALWAYS 1
 )
 
-px4_add_git_submodule(TARGET git_flightgear_bridge PATH "${PX4_SOURCE_DIR}/Tools/flightgear_bridge")
-ExternalProject_Add(flightgear_bridge
-	SOURCE_DIR ${PX4_SOURCE_DIR}/Tools/flightgear_bridge
-	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-	BINARY_DIR ${PX4_BINARY_DIR}/build_flightgear_bridge
-	INSTALL_COMMAND ""
-	DEPENDS git_flightgear_bridge
-	USES_TERMINAL_CONFIGURE true
-	USES_TERMINAL_BUILD true
-	EXCLUDE_FROM_ALL true
-	BUILD_ALWAYS 1
-)
+set(HAVE_FLIGHTGEAR_BRIDGE OFF)
+if(EXISTS ${PX4_SOURCE_DIR}/Tools/flightgear_bridge/CMakeLists.txt)
+	px4_add_git_submodule(TARGET git_flightgear_bridge PATH "${PX4_SOURCE_DIR}/Tools/flightgear_bridge")
+	ExternalProject_Add(flightgear_bridge
+		SOURCE_DIR ${PX4_SOURCE_DIR}/Tools/flightgear_bridge
+		CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+		BINARY_DIR ${PX4_BINARY_DIR}/build_flightgear_bridge
+		INSTALL_COMMAND ""
+		DEPENDS git_flightgear_bridge
+		USES_TERMINAL_CONFIGURE true
+		USES_TERMINAL_BUILD true
+		EXCLUDE_FROM_ALL true
+		BUILD_ALWAYS 1
+	)
+	set(HAVE_FLIGHTGEAR_BRIDGE ON)
+else()
+	message(STATUS "Tools/flightgear_bridge is missing or empty, skipping FlightGear bridge build.")
+endif()
 
 px4_add_git_submodule(TARGET git_jsbsim_bridge PATH "${PX4_SOURCE_DIR}/Tools/jsbsim_bridge")
 ExternalProject_Add(jsbsim_bridge
@@ -325,7 +331,7 @@ foreach(debugger ${debuggers})
 endforeach()
 
 # add flighgear targets
-if(ENABLE_LOCKSTEP_SCHEDULER STREQUAL "no")
+if(HAVE_FLIGHTGEAR_BRIDGE AND ENABLE_LOCKSTEP_SCHEDULER STREQUAL "no")
 	set(models
 		rascal
 		rascal-electric

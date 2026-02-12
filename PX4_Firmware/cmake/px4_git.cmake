@@ -78,14 +78,32 @@ function(px4_add_git_submodule)
 	string(REPLACE "/" "_" NAME ${PATH})
 	string(REPLACE "." "_" NAME ${NAME})
 
-	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
-		COMMAND Tools/check_submodules.sh ${REL_PATH}
-		COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
-		DEPENDS ${PX4_SOURCE_DIR}/.gitmodules ${PATH}/.git
-		COMMENT "git submodule ${REL_PATH}"
-		WORKING_DIRECTORY ${PX4_SOURCE_DIR}
-		USES_TERMINAL
-		)
+	set(_submodule_depends)
+	if(EXISTS ${PX4_SOURCE_DIR}/.gitmodules)
+		list(APPEND _submodule_depends ${PX4_SOURCE_DIR}/.gitmodules)
+	endif()
+	if(EXISTS ${PATH}/.git)
+		list(APPEND _submodule_depends ${PATH}/.git)
+	endif()
+
+	if(_submodule_depends)
+		add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
+			COMMAND Tools/check_submodules.sh ${REL_PATH}
+			COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
+			DEPENDS ${_submodule_depends}
+			COMMENT "git submodule ${REL_PATH}"
+			WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+			USES_TERMINAL
+			)
+	else()
+		add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
+			COMMAND Tools/check_submodules.sh ${REL_PATH}
+			COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/git_init_${NAME}.stamp
+			COMMENT "git submodule ${REL_PATH}"
+			WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+			USES_TERMINAL
+			)
+	endif()
 
 	add_custom_target(${TARGET} DEPENDS git_init_${NAME}.stamp)
 endfunction()

@@ -40,3 +40,6 @@ PX4_Firmware/compile_commands.json
 **/*.log
 **/*.bag
 **/*.ulg
+
+# Local agent notes (keep local only)
+AGENTS.md

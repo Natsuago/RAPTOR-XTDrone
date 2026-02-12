@@ -32,6 +32,8 @@
 ############################################################################
 
 # check if px4 source is a git repo
+set(px4_using_parent_git FALSE)
+
 if (EXISTS ${PX4_SOURCE_DIR}/.git)
 	if (IS_DIRECTORY ${PX4_SOURCE_DIR}/.git)
 		# standard git repo
@@ -44,7 +46,23 @@ if (EXISTS ${PX4_SOURCE_DIR}/.git)
 		get_filename_component(git_dir_path "${git_dir_path}" REALPATH BASE_DIR ${PX4_SOURCE_DIR})
 	endif()
 else()
-	message(FATAL_ERROR "is not a git repository")
+	# allow building when PX4 is vendored into a larger git repository
+	execute_process(
+		COMMAND git rev-parse --git-dir
+		WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+		OUTPUT_VARIABLE git_dir_path
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		RESULT_VARIABLE git_dir_result
+		ERROR_QUIET
+	)
+
+	if(git_dir_result EQUAL 0)
+		get_filename_component(git_dir_path "${git_dir_path}" REALPATH BASE_DIR ${PX4_SOURCE_DIR})
+		set(px4_using_parent_git TRUE)
+		message(STATUS "Using parent git repository: ${git_dir_path}")
+	else()
+		message(FATAL_ERROR "is not a git repository")
+	endif()
 endif()
 
 if(NOT IS_DIRECTORY "${git_dir_path}")
@@ -52,8 +70,14 @@ if(NOT IS_DIRECTORY "${git_dir_path}")
 endif()
 
 set(px4_git_ver_header ${CMAKE_CURRENT_BINARY_DIR}/build_git_version.h)
+set(px4_git_validate_arg --validate)
+if(px4_using_parent_git)
+	set(px4_git_validate_arg)
+	message(STATUS "Skipping PX4 git tag format validation for parent repository builds.")
+endif()
+
 add_custom_command(OUTPUT ${px4_git_ver_header}
-	COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/px_update_git_header.py ${px4_git_ver_header} --validate
+	COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/px_update_git_header.py ${px4_git_ver_header} ${px4_git_validate_arg}
 	DEPENDS
 		${CMAKE_CURRENT_SOURCE_DIR}/px_update_git_header.py
 		${git_dir_path}/HEAD

@@ -36,7 +36,9 @@
 # We depend on our submodules, so we have to prevent attempts to
 # compile without it being present.
 ifeq ($(wildcard .git),)
+ifndef PX4_ALLOW_NO_GIT
     $(error YOU HAVE TO USE GIT TO DOWNLOAD THIS REPOSITORY. ABORTING.)
+endif
 endif
 
 # Help
@@ -132,6 +134,10 @@ endif
 # additional config parameters passed to cmake
 ifdef EXTERNAL_MODULES_LOCATION
 	CMAKE_ARGS += -DEXTERNAL_MODULES_LOCATION:STRING=$(EXTERNAL_MODULES_LOCATION)
+endif
+
+ifdef RL_TOOLS_ROOT
+	CMAKE_ARGS += -DRL_TOOLS_ROOT:STRING=$(RL_TOOLS_ROOT)
 endif
 
 ifdef PX4_CMAKE_BUILD_TYPE
